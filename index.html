@@ -589,7 +589,7 @@ catch(e){ console.error('Supabase init failed', e); }
 const SUPABASE_NEEDS_SETUP = SUPABASE_URL.includes('YOUR-PROJECT-REF') || SUPABASE_ANON_KEY.includes('YOUR-ANON') || !sb;
 if(SUPABASE_NEEDS_SETUP){
   document.getElementById('setupBanner').classList.add('show');
-  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('loadingScreen').classList.add('hidden');
 }
 
 // ================= I18N =================
@@ -1667,9 +1667,18 @@ if(!SUPABASE_NEEDS_SETUP){
       }
     })();
     await Promise.all([authCheck, minDelay]);
-    document.getElementById('loadingScreen').style.display = 'none';
+    document.getElementById('loadingScreen').classList.add('hidden');
   })();
 }
+document.getElementById('togglePassword').addEventListener('click', () => {
+    const input = document.getElementById('auth_password');
+
+    if (input.type === 'password') {
+        input.type = 'text';
+    } else {
+        input.type = 'password';
+    }
+});
 </script>
 </body>
 </html>
