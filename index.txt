@@ -1,0 +1,1463 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarginFlow — прибыль, точка безубыточности, KPI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=PT+Serif:wght@400;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F3F1EC;
+    --bg-grad1:#EFE6D8;
+    --bg-grad2:#E3ECE6;
+    --panel:rgba(255,255,255,.62);
+    --panel-solid:#FFFFFF;
+    --panel-soft:rgba(255,255,255,.42);
+    --ink:#15181C;
+    --ink-soft:#666E68;
+    --line:rgba(21,24,28,.08);
+    --glass-border:rgba(255,255,255,.55);
+    --gold:#A9791C;
+    --gold-soft:#F3EAD2;
+    --profit:#1F8F63;
+    --profit-soft:#E4F4EC;
+    --loss:#C43E32;
+    --loss-soft:#FBEAE8;
+    --shadow: 0 1px 1px rgba(20,20,15,.03), 0 12px 32px -8px rgba(20,20,15,.14);
+    --shadow-lg: 0 20px 60px -12px rgba(20,20,15,.22), 0 4px 16px -4px rgba(20,20,15,.1);
+    --blur: 18px;
+    --radius:18px;
+    --radius-sm:12px;
+    --ease: cubic-bezier(.22,1,.36,1);
+  }
+  html[data-theme="dark"]{
+    --bg:#0A0D12;
+    --bg-grad1:#161225;
+    --bg-grad2:#0C1F1A;
+    --panel:rgba(22,26,34,.58);
+    --panel-solid:#12161D;
+    --panel-soft:rgba(255,255,255,.04);
+    --ink:#EDEEEA;
+    --ink-soft:#8A9099;
+    --line:rgba(255,255,255,.09);
+    --glass-border:rgba(255,255,255,.10);
+    --gold:#D4AF56;
+    --gold-soft:rgba(212,175,86,.12);
+    --profit:#3FBB86;
+    --profit-soft:rgba(63,187,134,.12);
+    --loss:#E1685A;
+    --loss-soft:rgba(225,104,90,.12);
+    --shadow: 0 1px 1px rgba(0,0,0,.3), 0 12px 32px -8px rgba(0,0,0,.5);
+    --shadow-lg: 0 24px 70px -14px rgba(0,0,0,.65), 0 6px 18px -4px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;color:var(--ink);
+    font-family:'Inter',sans-serif;min-height:100vh;
+    transition:background-color .35s var(--ease), color .35s var(--ease);
+    background-color:var(--bg);
+    background-image:
+      radial-gradient(720px 480px at 8% -8%, var(--bg-grad1), transparent 60%),
+      radial-gradient(680px 520px at 108% 10%, var(--bg-grad2), transparent 55%);
+    background-attachment:fixed;
+    background-repeat:no-repeat;
+  }
+  .serif{font-family:'PT Serif',serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .view{display:none;min-height:100vh;}
+  .view.active{display:block;animation:viewIn .45s var(--ease);}
+  @keyframes viewIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+  a,button,input,select{font-family:inherit;}
+  input,select{color:var(--ink);}
+  ::selection{background:var(--gold-soft);color:var(--ink);}
+
+  /* ---------- LOADING SCREEN ---------- */
+  #loadingScreen{
+    position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:18px;background:var(--bg);
+    background-image:
+      radial-gradient(720px 480px at 8% -8%, var(--bg-grad1), transparent 60%),
+      radial-gradient(680px 520px at 108% 10%, var(--bg-grad2), transparent 55%);
+    transition:opacity .5s var(--ease), visibility .5s var(--ease);
+  }
+  #loadingScreen.hidden{opacity:0;visibility:hidden;pointer-events:none;}
+  .load-logo{display:flex;align-items:center;gap:10px;}
+  .load-logo .dot{width:12px;height:12px;border-radius:50%;background:var(--gold);animation:pulseDot 1.3s ease-in-out infinite;}
+  .load-logo span{font-family:'PT Serif',serif;font-weight:700;font-size:26px;letter-spacing:.01em;color:var(--ink);}
+  @keyframes pulseDot{0%,100%{transform:scale(1);opacity:1;}50%{transform:scale(1.5);opacity:.5;}}
+  .load-bar{width:160px;height:3px;border-radius:3px;background:var(--line);overflow:hidden;}
+  .load-bar::after{
+    content:'';display:block;width:40%;height:100%;background:var(--gold);border-radius:3px;
+    animation:loadSweep 1.1s ease-in-out infinite;
+  }
+  @keyframes loadSweep{0%{transform:translateX(-100%);}100%{transform:translateX(350%);}}
+
+  /* ---------- TOASTS ---------- */
+  #toastContainer{
+    position:fixed;bottom:20px;right:20px;z-index:9998;display:flex;flex-direction:column;gap:10px;
+    max-width:320px;
+  }
+  .toast{
+    display:flex;align-items:center;gap:10px;padding:13px 16px;border-radius:var(--radius-sm);
+    background:var(--panel-solid);border:1px solid var(--line);box-shadow:var(--shadow-lg);
+    font-size:13px;color:var(--ink);animation:toastIn .35s var(--ease);
+  }
+  .toast.leaving{animation:toastOut .3s var(--ease) forwards;}
+  @keyframes toastIn{from{opacity:0;transform:translateX(24px) scale(.96);}to{opacity:1;transform:translateX(0) scale(1);}}
+  @keyframes toastOut{to{opacity:0;transform:translateX(24px) scale(.96);}}
+  .toast .ic{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:12px;flex-shrink:0;}
+  .toast.success .ic{background:var(--profit-soft);color:var(--profit);}
+  .toast.info .ic{background:var(--gold-soft);color:var(--gold);}
+  .toast.error .ic{background:var(--loss-soft);color:var(--loss);}
+
+  /* ---------- AUTH ---------- */
+  #view-auth{
+    display:none;min-height:100vh;
+    align-items:center;justify-content:center;padding:24px;
+
+  }
+  #view-auth.active{display:flex;}
+  .auth-card{
+    width:100%;max-width:380px;background:var(--panel);border:1px solid var(--line);
+    border-radius:var(--radius);box-shadow:var(--shadow);padding:36px 30px;
+  }
+  .auth-logo{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+  .auth-logo .dot{width:10px;height:10px;border-radius:50%;background:var(--gold);}
+  .auth-logo span{font-family:'PT Serif',serif;font-weight:700;font-size:20px;letter-spacing:.01em;}
+  .auth-sub{color:var(--ink-soft);font-size:13px;margin:0 0 26px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:6px;letter-spacing:.02em;}
+  .field input, .field select{
+    width:100%;font-size:14.5px;padding:11px 13px;border:1.5px solid var(--line);
+    border-radius:var(--radius-sm);background:var(--panel-soft);outline:none;transition:.2s var(--ease);
+  }
+  .field input:focus{border-color:var(--gold);box-shadow:0 0 0 4px var(--gold-soft);}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    font-size:14px;font-weight:600;padding:12px 18px;border-radius:var(--radius-sm);border:none;
+    cursor:pointer;transition:.2s var(--ease);
+  }
+  .btn-gold{background:var(--gold);color:#1A1200;width:100%;box-shadow:0 8px 20px -6px rgba(169,121,28,.5);}
+  .btn-gold:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 12px 26px -6px rgba(169,121,28,.6);}
+  .btn-gold:active{transform:translateY(0);}
+  html[data-theme="dark"] .btn-gold{color:#0B0E13;}
+  .btn-ghost{background:var(--panel-soft);border:1.5px solid var(--line);color:var(--ink-soft);backdrop-filter:blur(var(--blur));}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--ink);transform:translateY(-1px);}
+  .auth-toggle{text-align:center;margin-top:18px;font-size:13px;color:var(--ink-soft);}
+  .auth-toggle a{color:var(--gold);text-decoration:none;cursor:pointer;font-weight:600;}
+  .auth-error{background:var(--loss-soft);color:var(--loss);font-size:12.5px;padding:9px 12px;border-radius:var(--radius-sm);margin-bottom:14px;display:none;animation:shake .35s;}
+  .auth-error.show{display:block;}
+  @keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-4px);}75%{transform:translateX(4px);}}
+  .auth-top-controls{position:fixed;top:18px;right:18px;display:flex;gap:8px;z-index:5;}
+
+  /* ---------- TOPBAR (dashboard + project) ---------- */
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;
+    padding:14px 24px;border-bottom:1px solid var(--line);background:var(--panel);
+    backdrop-filter:blur(var(--blur)) saturate(160%);-webkit-backdrop-filter:blur(var(--blur)) saturate(160%);
+    position:sticky;top:0;z-index:20;
+  }
+  .topbar-left{display:flex;align-items:center;gap:14px;}
+  .brand{display:flex;align-items:center;gap:8px;cursor:pointer;transition:.2s var(--ease);}
+  .brand:hover{opacity:.75;}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 4px var(--gold-soft);}
+  .brand span{font-family:'PT Serif',serif;font-weight:700;font-size:18px;}
+  .crumb{color:var(--ink-soft);font-size:13px;}
+  .topbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  select.mini, .icon-btn{
+    font-size:12.5px;font-weight:600;padding:7px 10px;border:1.5px solid var(--line);
+    border-radius:var(--radius-sm);background:var(--panel-soft);color:var(--ink);cursor:pointer;outline:none;
+    transition:.2s var(--ease);
+  }
+  .icon-btn{width:34px;height:34px;padding:0;display:flex;align-items:center;justify-content:center;}
+  .icon-btn:hover, select.mini:hover{border-color:var(--gold);transform:translateY(-1px);}
+  .save-pill{
+    font-size:11px;color:var(--profit);display:flex;align-items:center;gap:6px;opacity:0;transition:opacity .3s var(--ease);
+  }
+  .save-pill.show{opacity:1;}
+  .save-pill::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--profit);}
+
+  @media print{
+    .topbar, .icon-btn, .no-print, .tabs, #view-dashboard, #view-auth, #toastContainer, #loadingScreen{display:none!important;}
+    #view-project{display:block!important;}
+    .panel-tab{display:block!important;page-break-after:always;}
+    body{background:#fff;}
+  }
+
+  /* ---------- DASHBOARD ---------- */
+  .dash-wrap{max-width:1120px;margin:0 auto;padding:36px 20px 80px;}
+  .dash-head{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:16px;margin-bottom:22px;}
+  .dash-head h1{font-family:'PT Serif',serif;font-size:26px;margin:0 0 6px;}
+  .dash-head p{color:var(--ink-soft);margin:0;font-size:14px;}
+  .dash-greeting{color:var(--gold);font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin:0 0 8px;}
+  .dash-toolbar{display:flex;justify-content:flex-end;margin-bottom:20px;}
+  .dash-search{
+    width:100%;max-width:280px;font-size:13.5px;padding:10px 14px;border:1.5px solid var(--line);
+    border-radius:var(--radius-sm);background:var(--panel-soft);color:var(--ink);outline:none;transition:.2s var(--ease);
+  }
+  .dash-search:focus{border-color:var(--gold);box-shadow:0 0 0 4px var(--gold-soft);}
+  .dash-empty-hint{color:var(--ink-soft);font-size:13.5px;margin:0;padding:4px 2px 14px;}
+
+  .feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:40px;}
+  .feature-card{
+    background:var(--panel);border:1px solid var(--glass-border);border-radius:var(--radius);
+    padding:22px;box-shadow:var(--shadow);backdrop-filter:blur(var(--blur)) saturate(160%);
+    -webkit-backdrop-filter:blur(var(--blur)) saturate(160%);
+    transition:transform .3s var(--ease), box-shadow .3s var(--ease);
+    animation:cardIn .5s var(--ease) backwards;
+  }
+  .feature-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);}
+  .feature-card .fic{
+    width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+    background:var(--gold-soft);color:var(--gold);margin-bottom:14px;
+  }
+  .feature-card .fic svg{width:20px;height:20px;}
+  .feature-card h3{font-family:'PT Serif',serif;font-size:15.5px;margin:0 0 6px;}
+  .feature-card p{font-size:12.5px;color:var(--ink-soft);margin:0;line-height:1.55;}
+  @keyframes cardIn{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+
+  .proj-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(230px,1fr));gap:16px;}
+  .proj-card{
+    background:var(--panel);border:1px solid var(--glass-border);border-radius:var(--radius);
+    padding:20px;cursor:pointer;transition:transform .25s var(--ease), box-shadow .25s var(--ease), border-color .25s var(--ease);
+    box-shadow:var(--shadow);position:relative;backdrop-filter:blur(var(--blur)) saturate(160%);
+    -webkit-backdrop-filter:blur(var(--blur)) saturate(160%);
+    animation:cardIn .45s var(--ease) backwards;
+  }
+  .proj-card:hover{border-color:var(--gold);transform:translateY(-4px);box-shadow:var(--shadow-lg);}
+  .proj-card h3{font-family:'PT Serif',serif;font-size:16px;margin:0 0 10px;padding-right:20px;}
+  .proj-card .meta{font-size:12px;color:var(--ink-soft);margin-bottom:14px;}
+  .proj-card .stat{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;}
+  .proj-card .stat b.mono{font-size:13px;}
+  .proj-card-foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:11px;border-top:1px dashed var(--line);}
+  .proj-currency{font-size:10.5px;color:var(--ink-soft);font-family:'JetBrains Mono',monospace;letter-spacing:.03em;}
+  .margin-chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:700;}
+  .margin-chip.good{background:var(--profit-soft);color:var(--profit);}
+  .margin-chip.warn{background:var(--gold-soft);color:#8A6A1E;}
+  html[data-theme="dark"] .margin-chip.warn{color:var(--gold);}
+  .margin-chip.bad{background:var(--loss-soft);color:var(--loss);}
+  .proj-del{
+    position:absolute;top:14px;right:14px;background:none;border:none;color:var(--ink-soft);
+    cursor:pointer;font-size:13px;opacity:.6;transition:.2s var(--ease);
+  }
+  .proj-del:hover{opacity:1;transform:scale(1.15);
+  }
+  .proj-del:hover{color:var(--loss);opacity:1;}
+  .proj-new{
+    border:1.5px dashed var(--line);border-radius:var(--radius);display:flex;align-items:center;
+    justify-content:center;flex-direction:column;gap:6px;cursor:pointer;color:var(--ink-soft);
+    padding:20px;min-height:120px;transition:.25s var(--ease);background:var(--panel-soft);
+  }
+  .proj-new:hover{border-color:var(--gold);color:var(--gold);transform:translateY(-4px);background:var(--gold-soft);}
+  .proj-new .plus{font-size:26px;line-height:1;transition:transform .25s var(--ease);}
+  .proj-new:hover .plus{transform:rotate(90deg);}
+  .empty-state{text-align:center;padding:60px 20px;color:var(--ink-soft);}
+
+  /* ---------- WELCOME (post-registration) ---------- */
+  .welcome-hero{text-align:center;max-width:640px;margin:16px auto 40px;}
+  .welcome-badge{
+    display:inline-block;padding:6px 14px;border-radius:20px;background:var(--profit-soft);color:var(--profit);
+    font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:20px;
+    animation:cardIn .4s var(--ease);
+  }
+  .welcome-hero h1{font-family:'PT Serif',serif;font-size:32px;margin:0 0 14px;line-height:1.25;}
+  .welcome-hero p{color:var(--ink-soft);font-size:15px;line-height:1.65;margin:0;}
+  .welcome-cta-wrap{display:flex;justify-content:center;margin-top:38px;}
+  .welcome-cta{padding:14px 36px;font-size:15px;width:auto;}
+  @media(max-width:640px){
+    .welcome-hero h1{font-size:24px;}
+  }
+
+  /* ---------- PROJECT ---------- */
+  .proj-wrap{max-width:1080px;margin:0 auto;padding:28px 20px 80px;}
+  .proj-title-row{display:flex;align-items:center;gap:14px;margin-bottom:6px;flex-wrap:wrap;}
+  .proj-title-row input{
+    font-family:'PT Serif',serif;font-size:24px;font-weight:700;border:none;background:transparent;
+    color:var(--ink);outline:none;padding:2px 4px;border-radius:5px;max-width:100%;transition:.2s var(--ease);
+  }
+  .proj-title-row input:focus{background:var(--panel-soft);}
+  .tabs{display:flex;gap:2px;margin:22px 0 0;border-bottom:2px solid var(--line);overflow-x:auto;}
+  .tabs button{
+    font-size:12.5px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;
+    background:transparent;border:none;padding:12px 16px;cursor:pointer;color:var(--ink-soft);
+    border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:.2s var(--ease);
+    position:relative;
+  }
+  .tabs button:hover{color:var(--ink);}
+  .tabs button.active{color:var(--ink);border-bottom-color:var(--gold);}
+  .panel-tab{display:none;padding-top:26px;}
+  .panel-tab.active{display:block;animation:fade .4s var(--ease);}
+  @keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+  .card{
+    background:var(--panel);border:1px solid var(--glass-border);border-radius:var(--radius);padding:22px;
+    box-shadow:var(--shadow);backdrop-filter:blur(var(--blur)) saturate(160%);-webkit-backdrop-filter:blur(var(--blur)) saturate(160%);
+    transition:box-shadow .3s var(--ease);
+  }
+  .card h2{font-family:'PT Serif',serif;font-size:17px;margin:0 0 16px;}
+
+  table.periods{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.periods th{
+    text-align:left;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft);
+    font-weight:700;padding:8px 6px;border-bottom:2px solid var(--line);white-space:nowrap;
+  }
+  table.periods td{padding:6px;border-bottom:1px solid var(--line);}
+  table.periods input{
+    width:100%;min-width:64px;border:none;background:transparent;font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;padding:5px;color:var(--ink);outline:none;border-radius:6px;transition:.15s var(--ease);
+  }
+  table.periods input:focus{background:var(--gold-soft);}
+  .num{text-align:right;}
+  .pos{color:var(--profit);font-weight:600;}
+  .neg{color:var(--loss);font-weight:600;}
+  .table-scroll{overflow-x:auto;}
+  .addrow{
+    margin-top:12px;background:var(--panel-soft);border:1.5px dashed var(--line);color:var(--ink-soft);
+    padding:9px 16px;font-size:12.5px;cursor:pointer;border-radius:var(--radius-sm);transition:.2s var(--ease);
+  }
+  .addrow:hover{border-color:var(--gold);color:var(--gold);transform:translateY(-1px);}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:22px;}
+  .kpi-card{
+    background:var(--panel-soft);border:1px solid var(--line);border-radius:var(--radius-sm);padding:16px;
+    transition:transform .25s var(--ease), box-shadow .25s var(--ease);animation:cardIn .4s var(--ease) backwards;
+  }
+  .kpi-card:hover{transform:translateY(-2px);box-shadow:var(--shadow);}
+  .kpi-card .label{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
+  .kpi-card .value{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;transition:.3s var(--ease);}
+  .kpi-card .delta{font-size:11px;margin-top:6px;display:flex;align-items:center;gap:4px;font-family:'JetBrains Mono',monospace;}
+  .kpi-card .delta.up{color:var(--profit);}
+  .kpi-card .delta.down{color:var(--loss);}
+
+  .receipt{
+    background:var(--panel-soft);border:1px solid var(--line);border-radius:var(--radius-sm);padding:18px 18px 16px;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .rline{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;color:var(--ink-soft);gap:10px;}
+  .rline b{color:var(--ink);font-weight:600;text-align:right;}
+  .rline.total{border-top:1px dashed var(--line);margin-top:6px;padding-top:12px;font-size:14.5px;color:var(--ink);}
+  .rline.total .val{font-size:19px;font-weight:700;}
+  .tag{display:inline-block;margin-top:12px;padding:6px 11px;font-size:11.5px;border-radius:var(--radius-sm);animation:cardIn .3s var(--ease);}
+  .tag.good{background:var(--profit-soft);color:var(--profit);}
+  .tag.bad{background:var(--loss-soft);color:var(--loss);}
+  .hint-note{font-size:11.5px;color:var(--ink-soft);margin-top:10px;line-height:1.5;}
+
+  .insight{
+    display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border-radius:var(--radius-sm);
+    font-size:13px;line-height:1.5;margin-bottom:8px;animation:cardIn .35s var(--ease) backwards;
+    transition:transform .2s var(--ease);
+  }
+  .insight:hover{transform:translateX(2px);}
+  .insight:last-child{margin-bottom:0;}
+  .insight .ic{font-size:14px;line-height:1.4;flex-shrink:0;}
+  .insight.bad{background:var(--loss-soft);color:var(--loss);}
+  .insight.warn{background:var(--gold-soft);color:#8A6A1E;}
+  html[data-theme="dark"] .insight.warn{color:var(--gold);}
+  .insight.good{background:var(--profit-soft);color:var(--profit);}
+  .insight.info{background:var(--panel-soft);color:var(--ink-soft);border:1px solid var(--line);}
+  .insights-empty{color:var(--ink-soft);font-size:13px;}
+
+  .growth-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px;}
+  .growth-table th{
+    text-align:right;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-soft);
+    font-weight:700;padding:8px 6px;border-bottom:2px solid var(--line);
+  }
+  .growth-table th:first-child, .growth-table td:first-child{text-align:left;}
+  .growth-table td{padding:8px 6px;text-align:right;border-bottom:1px solid var(--line);font-family:'JetBrains Mono',monospace;}
+  .growth-chip{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px;font-size:11px;}
+  .growth-chip.up{background:var(--profit-soft);color:var(--profit);}
+  .growth-chip.down{background:var(--loss-soft);color:var(--loss);}
+  .growth-chip.flat{background:var(--panel-soft);color:var(--ink-soft);}
+
+  .grid2{display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;}
+  @media (max-width:800px){.grid2{grid-template-columns:1fr;}}
+
+  select.period-pick{
+    font-family:'JetBrains Mono',monospace;font-size:12.5px;padding:6px 9px;border:1.5px solid var(--line);
+    border-radius:var(--radius-sm);background:var(--panel-soft);color:var(--ink);margin-bottom:14px;
+  }
+
+  canvas{width:100%;height:230px;margin-top:8px;}
+
+  footer.mf-footer{max-width:1080px;margin:40px auto 0;padding:18px 20px 0;border-top:1px solid var(--line);
+    font-size:11px;color:var(--ink-soft);display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;}
+
+  @media(max-width:640px){
+    .topbar{padding:12px 14px;}
+    .dash-wrap,.proj-wrap{padding-left:14px;padding-right:14px;}
+    .proj-title-row input{font-size:20px;}
+    .kpi-card .value{font-size:18px;}
+    /* Prevent mobile browsers from auto-zooming the page when a small-font
+       input gets focus — that sudden zoom is what feels like the field
+       "flying out" while typing. 16px is the minimum that avoids it. */
+    table.periods input, select.mini, select.period-pick, #currency,
+    .field input, .field select{
+      font-size:16px!important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ LOADING SCREEN ============ -->
+<div id="loadingScreen">
+  <div class="load-logo"><span class="dot"></span><span>MarginFlow</span></div>
+  <div class="load-bar"></div>
+</div>
+
+<!-- ============ TOASTS ============ -->
+<div id="toastContainer"></div>
+
+<!-- ============ AUTH VIEW ============ -->
+<div id="view-auth" class="view">
+  <div class="auth-top-controls no-print">
+    <button class="icon-btn" id="authThemeBtn" aria-label="theme">☾</button>
+    <select class="mini" id="authLangSelect">
+      <option value="ru">RU</option>
+      <option value="en">EN</option>
+    </select>
+  </div>
+  <div class="auth-card">
+    <div class="auth-logo"><span class="dot"></span><span>MarginFlow</span></div>
+    <p class="auth-sub" data-i18n="auth_sub">Прибыль, точка безубыточности и KPI вашего бизнеса</p>
+    <div class="auth-error" id="authError"></div>
+    <div id="authFields">
+      <div class="field">
+        <label data-i18n="auth_email">Email</label>
+        <input id="auth_email" type="email" autocomplete="email" placeholder="you@example.com">
+      </div>
+      <div class="field">
+        <label data-i18n="auth_password">Пароль</label>
+        <input id="auth_password" type="password" autocomplete="current-password">
+      </div>
+    </div>
+    <button class="btn btn-gold" id="authSubmit" data-i18n="auth_login_btn">Войти</button>
+    <p class="auth-toggle" id="authToggleText">
+      <span data-i18n="auth_no_account">Нет аккаунта?</span> <a id="authToggleLink" data-i18n="auth_register_link">Зарегистрироваться</a>
+    </p>
+  </div>
+</div>
+
+<!-- ============ WELCOME VIEW (shown once, right after registration) ============ -->
+<div id="view-welcome" class="view">
+  <div class="topbar no-print">
+    <div class="topbar-left">
+      <div class="brand"><span class="dot"></span><span>MarginFlow</span></div>
+    </div>
+    <div class="topbar-right">
+      <select class="mini" id="welcomeLangSelect"><option value="ru">RU</option><option value="en">EN</option></select>
+      <button class="icon-btn" id="welcomeThemeBtn">☾</button>
+    </div>
+  </div>
+  <div class="dash-wrap">
+    <div class="welcome-hero">
+      <span class="welcome-badge" data-i18n="welcome_badge">Аккаунт создан</span>
+      <h1 data-i18n="welcome_title">Добро пожаловать в MarginFlow</h1>
+      <p data-i18n="welcome_sub">Считайте прибыль, точку безубыточности и KPI вашего бизнеса — быстро, наглядно, локально в браузере.</p>
+    </div>
+
+    <div class="feature-grid">
+      <div class="feature-card" style="animation-delay:.02s">
+        <div class="fic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        <h3 data-i18n="feat1_title">Расчёт цены</h3>
+        <p data-i18n="feat1_text">Себестоимость, наценка и цена продажи — с мгновенным пересчётом маржи.</p>
+      </div>
+      <div class="feature-card" style="animation-delay:.08s">
+        <div class="fic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18M7 15l4-5 3 3 5-7"/></svg></div>
+        <h3 data-i18n="feat2_title">Анализ прибыли</h3>
+        <p data-i18n="feat2_text">Выручка минус все расходы — прибыль или убыток видны по каждому периоду.</p>
+      </div>
+      <div class="feature-card" style="animation-delay:.14s">
+        <div class="fic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></div>
+        <h3 data-i18n="feat3_title">Точка безубыточности</h3>
+        <p data-i18n="feat3_text">Сколько нужно продать, чтобы выйти в ноль — с учётом постоянных расходов.</p>
+      </div>
+      <div class="feature-card" style="animation-delay:.2s">
+        <div class="fic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="3" width="4" height="18"/></svg></div>
+        <h3 data-i18n="feat4_title">KPI и графики</h3>
+        <p data-i18n="feat4_text">Динамика выручки, расходов и прибыли по месяцам с ростом в процентах.</p>
+      </div>
+    </div>
+
+    <div class="welcome-cta-wrap">
+      <button class="btn btn-gold welcome-cta" id="welcomeCtaBtn" data-i18n="welcome_cta">Перейти в личный кабинет</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DASHBOARD VIEW ============ -->
+<div id="view-dashboard" class="view">
+  <div class="topbar no-print">
+    <div class="topbar-left">
+      <div class="brand"><span class="dot"></span><span>MarginFlow</span></div>
+      <span class="crumb" id="dashUserLabel"></span>
+    </div>
+    <div class="topbar-right">
+      <select class="mini" id="dashLangSelect"><option value="ru">RU</option><option value="en">EN</option></select>
+      <button class="icon-btn" id="dashThemeBtn">☾</button>
+      <button class="btn btn-ghost" id="logoutBtn" data-i18n="logout_btn">Выйти</button>
+    </div>
+  </div>
+  <div class="dash-wrap">
+    <div class="dash-head">
+      <div>
+        <p class="dash-greeting" id="dashGreeting"></p>
+        <h1 data-i18n="dash_title">Ваши проекты</h1>
+        <p data-i18n="dash_sub">Выберите проект или создайте новый, чтобы рассчитать прибыль и точку безубыточности</p>
+      </div>
+    </div>
+
+    <div class="dash-toolbar no-print">
+      <input type="text" id="projSearch" class="dash-search" data-i18n-placeholder="search_placeholder" placeholder="Поиск проектов…">
+    </div>
+
+    <div class="kpi-grid" id="dashStatsGrid"></div>
+
+    <div class="proj-grid" id="projGrid"></div>
+  </div>
+</div>
+
+<!-- ============ PROJECT VIEW ============ -->
+<div id="view-project" class="view">
+  <div class="topbar no-print">
+    <div class="topbar-left">
+      <div class="brand" id="backToDash"><span class="dot"></span><span>MarginFlow</span></div>
+      <span class="crumb" data-i18n="crumb_project">/ Проект</span>
+    </div>
+    <div class="topbar-right">
+      <span class="save-pill" id="savePill" data-i18n="saved_label">Сохранено</span>
+      <select class="mini" id="projLangSelect"><option value="ru">RU</option><option value="en">EN</option></select>
+      <select class="mini" id="projCurrency">
+        <option value="RUB">₽ RUB</option><option value="USD">$ USD</option><option value="EUR">€ EUR</option>
+        <option value="KZT">₸ KZT</option><option value="UAH">₴ UAH</option><option value="GBP">£ GBP</option>
+      </select>
+      <button class="icon-btn" id="projThemeBtn">☾</button>
+      <button class="btn btn-ghost" id="saveProjectBtn" data-i18n="save_btn">Сохранить проект</button>
+      <button class="btn btn-ghost" id="exportBtn" data-i18n="export_btn">Экспорт PDF</button>
+    </div>
+  </div>
+
+  <div class="proj-wrap">
+    <div class="proj-title-row">
+      <input id="projName" type="text" value="Проект">
+    </div>
+
+    <nav class="tabs">
+      <button class="active" data-ptab="periods" data-i18n="ptab1">01 · Данные и прибыль</button>
+      <button data-ptab="breakeven" data-i18n="ptab2">02 · Точка безубыточности</button>
+      <button data-ptab="kpi" data-i18n="ptab3">03 · KPI и графики</button>
+    </nav>
+
+    <!-- TAB 1: periods / profit -->
+    <section class="panel-tab active" id="ptab-periods">
+      <div class="kpi-grid" id="latestKpiGrid"></div>
+      <div class="card" id="insightsCard" style="margin-bottom:20px;">
+        <h2 data-i18n="insights_title">Рекомендации и предупреждения</h2>
+        <div id="insightsList"></div>
+      </div>
+      <div class="card">
+        <h2 data-i18n="periods_title">Периоды</h2>
+        <div class="table-scroll">
+          <table class="periods">
+            <thead>
+              <tr>
+                <th data-i18n="col_label">Период</th>
+                <th class="num" data-i18n="col_revenue">Выручка</th>
+                <th class="num" data-i18n="col_cogs">Себестоимость</th>
+                <th class="num" data-i18n="col_qty">Кол-во продаж</th>
+                <th class="num" data-i18n="col_salaries">Зарплаты</th>
+                <th class="num" data-i18n="col_rent">Аренда</th>
+                <th class="num" data-i18n="col_taxes">Налоги %</th>
+                <th class="num" data-i18n="col_extra">Доп. расходы</th>
+                <th class="num" data-i18n="col_profit">Прибыль/убыток</th>
+                <th class="num" data-i18n="col_margin">Маржа</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="periodsBody"></tbody>
+          </table>
+        </div>
+        <button class="addrow" id="addPeriod" data-i18n="add_period">+ добавить период</button>
+      </div>
+    </section>
+
+    <!-- TAB 2: break-even -->
+    <section class="panel-tab" id="ptab-breakeven">
+      <select class="period-pick" id="bePeriodPick"></select>
+      <div class="grid2">
+        <div class="card">
+          <h2 data-i18n="be_title">Точка безубыточности</h2>
+          <div class="rline"><span data-i18n="be_fixed">Постоянные расходы (зарплаты + аренда + доп.)</span><b class="mono" id="be_fixed">—</b></div>
+          <div class="rline"><span data-i18n="be_price">Цена за единицу</span><b class="mono" id="be_price">—</b></div>
+          <div class="rline"><span data-i18n="be_var">Переменные расходы на единицу</span><b class="mono" id="be_var">—</b></div>
+          <p class="hint-note" data-i18n="be_note">Налоги не включены в расчёт точки безубыточности, так как зависят от выручки.</p>
+        </div>
+        <div class="receipt">
+          <div class="rline"><span data-i18n="be_margin_unit">Маржа с единицы</span><b id="be_marginunit">—</b></div>
+          <div class="rline total"><span data-i18n="be_units">Точка безубыточности</span><span class="val" id="be_units">—</span></div>
+          <div class="rline"><span data-i18n="be_revenue">...или выручка</span><b id="be_revenue">—</b></div>
+          <div id="be_tag"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: KPI -->
+    <section class="panel-tab" id="ptab-kpi">
+      <div class="kpi-grid" id="kpiSummaryGrid"></div>
+      <div class="card" style="margin-bottom:20px;">
+        <h2 data-i18n="chart_title">Выручка, расходы и прибыль по периодам</h2>
+        <canvas id="chart" height="230"></canvas>
+      </div>
+      <div class="card">
+        <h2 data-i18n="growth_title">Рост по периодам</h2>
+        <div class="table-scroll">
+          <table class="growth-table" id="growthTable"></table>
+        </div>
+      </div>
+    </section>
+
+    <footer class="mf-footer">
+      <span>MarginFlow</span>
+      <span data-i18n="footer_note">Все расчёты выполняются локально в браузере</span>
+    </footer>
+  </div>
+</div>
+
+<script>
+// ================= I18N =================
+const I18N = {
+  ru:{
+    page_title:"MarginFlow — прибыль, точка безубыточности, KPI",
+    auth_sub:"Прибыль, точка безубыточности и KPI вашего бизнеса",
+    auth_email:"Email", auth_password:"Пароль",
+    auth_login_btn:"Войти", auth_register_btn:"Создать аккаунт",
+    auth_no_account:"Нет аккаунта?", auth_register_link:"Зарегистрироваться",
+    auth_has_account:"Уже есть аккаунт?", auth_login_link:"Войти",
+    err_fill:"Заполните email и пароль",
+    err_short:"Пароль должен быть не короче 4 символов",
+    err_invalid_email:"Введите корректный email",
+    err_exists:"Пользователь с такой почтой уже существует",
+    err_notfound:"Неверная почта или пароль",
+    logout_btn:"Выйти",
+    welcome_badge:"Аккаунт создан",
+    welcome_title:"Добро пожаловать в MarginFlow",
+    welcome_sub:"Считайте прибыль, точку безубыточности и KPI вашего бизнеса — быстро, наглядно, и полностью локально в браузере.",
+    welcome_cta:"Перейти в личный кабинет",
+    dash_title:"Ваши проекты",
+    dash_sub:"Выберите проект или создайте новый, чтобы рассчитать прибыль и точку безубыточности",
+    new_project:"Новый проект", empty_projects:"Пока нет ни одного проекта — создайте первый",
+    default_project_name:"Новый проект",
+    search_placeholder:"Поиск проектов…",
+    greeting_morning:"Доброе утро", greeting_day:"Добрый день", greeting_evening:"Добрый вечер", greeting_night:"Доброй ночи",
+    stat_total_projects:"Всего проектов", stat_profitable:"Прибыльных / убыточных",
+    stat_avg_margin:"Средняя маржа", stat_best_project:"Лучший проект",
+    crumb_project:"/ Проект",
+    saved_label:"Сохранено", export_btn:"Экспорт PDF", save_btn:"Сохранить проект",
+    feat1_title:"Расчёт цены", feat1_text:"Себестоимость, наценка и цена продажи — с мгновенным пересчётом маржи.",
+    feat2_title:"Анализ прибыли", feat2_text:"Выручка минус все расходы — прибыль или убыток видны по каждому периоду.",
+    feat3_title:"Точка безубыточности", feat3_text:"Сколько нужно продать, чтобы выйти в ноль — с учётом постоянных расходов.",
+    feat4_title:"KPI и графики", feat4_text:"Динамика выручки, расходов и прибыли по месяцам с ростом в процентах.",
+    toast_saved:"Проект сохранён", toast_created:"Проект создан", toast_deleted:"Проект удалён",
+    toast_welcome:name=>`С возвращением, ${name}!`, toast_registered:name=>`Аккаунт создан. Добро пожаловать, ${name}!`,
+    growth_title:"Рост по периодам", growth_period:"Период", growth_revenue:"Выручка", growth_expenses:"Расходы", growth_profit:"Прибыль",
+    ptab1:"01 · Данные и прибыль", ptab2:"02 · Точка безубыточности", ptab3:"03 · KPI и графики",
+    periods_title:"Периоды",
+    col_label:"Период", col_revenue:"Выручка", col_cogs:"Себестоимость", col_qty:"Кол-во продаж",
+    col_salaries:"Зарплаты", col_rent:"Аренда", col_taxes:"Налоги %", col_extra:"Доп. расходы",
+    col_profit:"Прибыль/убыток", col_margin:"Маржа",
+    add_period:"+ добавить период",
+    be_title:"Точка безубыточности",
+    be_fixed:"Постоянные расходы (зарплаты + аренда + доп.)",
+    be_price:"Цена за единицу", be_var:"Переменные расходы на единицу",
+    be_note:"Налоги не включены в расчёт точки безубыточности, так как зависят от выручки.",
+    be_margin_unit:"Маржа с единицы", be_units:"Точка безубыточности", be_revenue:"...или выручка",
+    be_bad:"Цена ниже переменных расходов — прибыли не будет ни при каком объёме",
+    be_ok:u=>`Продавайте больше ${u} шт., чтобы выйти в прибыль`,
+    be_units_suffix:"шт.",
+    kpi_revenue:"Выручка", kpi_expenses:"Расходы", kpi_profit:"Прибыль/убыток", kpi_margin:"Маржа",
+    kpi_total_revenue:"Выручка за все периоды", kpi_total_profit:"Суммарная прибыль",
+    kpi_avg_margin:"Средняя маржа", kpi_best:"Лучший период",
+    chart_title:"Выручка, расходы и прибыль по периодам",
+    footer_note:"Все расчёты выполняются локально в браузере",
+    months:['Период 1','Период 2','Период 3','Период 4','Период 5','Период 6'],
+    profit_word:"Прибыль", loss_word:"Убыток",
+    insights_title:"Рекомендации и предупреждения",
+    insights_empty:"Добавьте данные периода — здесь появятся рекомендации",
+    ins_loss:(rev,exp)=>`Убыток: расходы (${exp}) превышают выручку (${rev}). Пересмотрите цены или сократите расходы.`,
+    ins_low_margin:m=>`Низкая маржа (${m}) — небольшой запас прочности на случай роста расходов или скидок.`,
+    ins_good_margin:m=>`Хорошая маржа (${m}) — устойчивый запас прочности.`,
+    ins_high_fixed:pct=>`Постоянные расходы (зарплаты, аренда, доп.) съедают ${pct} выручки — высокая нагрузка при просадке продаж.`,
+    ins_high_tax:pct=>`Налоги составляют ${pct} выручки — учитывайте это при планировании цены.`,
+    ins_below_breakeven:units=>`Продажи ниже точки безубыточности: не хватает ещё ${units} шт., чтобы выйти в ноль.`,
+    ins_profit_down:pct=>`Прибыль снизилась на ${pct} по сравнению с предыдущим периодом.`,
+    ins_profit_up:pct=>`Прибыль выросла на ${pct} по сравнению с предыдущим периодом.`,
+    ins_margin_trend_down:"Маржа снижается уже несколько периодов подряд — стоит проверить структуру расходов.",
+    ins_no_qty:"Не указано количество продаж — точка безубыточности и цена за единицу не могут быть рассчитаны.",
+  },
+  en:{
+    page_title:"MarginFlow — profit, break-even point, KPI",
+    auth_sub:"Profit, break-even point and KPIs for your business",
+    auth_email:"Email", auth_password:"Password",
+    auth_login_btn:"Sign in", auth_register_btn:"Create account",
+    auth_no_account:"No account?", auth_register_link:"Sign up",
+    auth_has_account:"Already have an account?", auth_login_link:"Sign in",
+    err_fill:"Enter an email and password",
+    err_short:"Password must be at least 4 characters",
+    err_invalid_email:"Enter a valid email address",
+    err_exists:"A user with this email already exists",
+    err_notfound:"Wrong email or password",
+    logout_btn:"Log out",
+    welcome_badge:"Account created",
+    welcome_title:"Welcome to MarginFlow",
+    welcome_sub:"Track profit, break-even point and KPIs for your business — fast, visual, and entirely local in your browser.",
+    welcome_cta:"Go to dashboard",
+    dash_title:"Your projects",
+    dash_sub:"Pick a project or create a new one to calculate profit and break-even",
+    new_project:"New project", empty_projects:"No projects yet — create your first one",
+    default_project_name:"New project",
+    search_placeholder:"Search projects…",
+    greeting_morning:"Good morning", greeting_day:"Good afternoon", greeting_evening:"Good evening", greeting_night:"Good night",
+    stat_total_projects:"Total projects", stat_profitable:"Profitable / losing",
+    stat_avg_margin:"Average margin", stat_best_project:"Best project",
+    crumb_project:"/ Project",
+    saved_label:"Saved", export_btn:"Export PDF", save_btn:"Save project",
+    feat1_title:"Price calculation", feat1_text:"Cost, markup and sale price — margin recalculated instantly.",
+    feat2_title:"Profit analysis", feat2_text:"Revenue minus every expense — profit or loss, visible per period.",
+    feat3_title:"Break-even point", feat3_text:"How much you need to sell to hit zero, factoring in fixed costs.",
+    feat4_title:"KPI & charts", feat4_text:"Revenue, expense and profit trends by month, with growth in percent.",
+    toast_saved:"Project saved", toast_created:"Project created", toast_deleted:"Project deleted",
+    toast_welcome:name=>`Welcome back, ${name}!`, toast_registered:name=>`Account created. Welcome, ${name}!`,
+    growth_title:"Growth by period", growth_period:"Period", growth_revenue:"Revenue", growth_expenses:"Expenses", growth_profit:"Profit",
+    ptab1:"01 · Data & profit", ptab2:"02 · Break-even point", ptab3:"03 · KPI & charts",
+    periods_title:"Periods",
+    col_label:"Period", col_revenue:"Revenue", col_cogs:"Cost of goods", col_qty:"Units sold",
+    col_salaries:"Salaries", col_rent:"Rent", col_taxes:"Taxes %", col_extra:"Extra costs",
+    col_profit:"Profit/loss", col_margin:"Margin",
+    add_period:"+ add period",
+    be_title:"Break-even point",
+    be_fixed:"Fixed costs (salaries + rent + extra)",
+    be_price:"Price per unit", be_var:"Variable cost per unit",
+    be_note:"Taxes are excluded from the break-even calculation since they scale with revenue.",
+    be_margin_unit:"Margin per unit", be_units:"Break-even point", be_revenue:"...or revenue",
+    be_bad:"Price is below variable cost — no volume will ever be profitable",
+    be_ok:u=>`Sell more than ${u} units to turn a profit`,
+    be_units_suffix:"units",
+    kpi_revenue:"Revenue", kpi_expenses:"Expenses", kpi_profit:"Profit/loss", kpi_margin:"Margin",
+    kpi_total_revenue:"Total revenue", kpi_total_profit:"Total profit",
+    kpi_avg_margin:"Average margin", kpi_best:"Best period",
+    chart_title:"Revenue, expenses and profit by period",
+    footer_note:"All calculations run locally in your browser",
+    months:['Period 1','Period 2','Period 3','Period 4','Period 5','Period 6'],
+    profit_word:"Profit", loss_word:"Loss",
+    insights_title:"Recommendations & warnings",
+    insights_empty:"Add period data — recommendations will appear here",
+    ins_loss:(rev,exp)=>`Loss: expenses (${exp}) exceed revenue (${rev}). Consider adjusting price or cutting costs.`,
+    ins_low_margin:m=>`Low margin (${m}) — little buffer against rising costs or discounts.`,
+    ins_good_margin:m=>`Healthy margin (${m}) — a solid safety buffer.`,
+    ins_high_fixed:pct=>`Fixed costs (salaries, rent, extra) eat up ${pct} of revenue — high exposure if sales drop.`,
+    ins_high_tax:pct=>`Taxes make up ${pct} of revenue — factor this into pricing.`,
+    ins_below_breakeven:units=>`Sales are below break-even: ${units} more units needed to reach zero.`,
+    ins_profit_down:pct=>`Profit dropped ${pct} compared to the previous period.`,
+    ins_profit_up:pct=>`Profit grew ${pct} compared to the previous period.`,
+    ins_margin_trend_down:"Margin has been declining for several periods in a row — worth reviewing your cost structure.",
+    ins_no_qty:"Units sold is not set — break-even and price per unit can't be calculated.",
+  },
+};
+let currentLang = localStorage.getItem('mf_lang') || 'ru';
+function applyLanguage(){
+  const t = I18N[currentLang];
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const k = el.getAttribute('data-i18n');
+    if(t[k]!==undefined) el.textContent = t[k];
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el=>{
+    const k = el.getAttribute('data-i18n-placeholder');
+    if(t[k]!==undefined) el.placeholder = t[k];
+  });
+  document.title = t.page_title;
+  document.getElementById('authSubmit').textContent = authMode==='login' ? t.auth_login_btn : t.auth_register_btn;
+  document.getElementById('authToggleText').innerHTML =
+    (authMode==='login'
+      ? `${t.auth_no_account} <a id="authToggleLink">${t.auth_register_link}</a>`
+      : `${t.auth_has_account} <a id="authToggleLink">${t.auth_login_link}</a>`);
+  document.getElementById('authToggleLink').addEventListener('click', toggleAuthMode);
+  document.documentElement.lang = currentLang;
+  [document.getElementById('authLangSelect'),document.getElementById('dashLangSelect'),document.getElementById('projLangSelect'),document.getElementById('welcomeLangSelect')]
+    .forEach(s=>{ if(s) s.value = currentLang; });
+}
+[['authLangSelect'],['dashLangSelect'],['projLangSelect'],['welcomeLangSelect']].forEach(([id])=>{
+  document.getElementById(id).addEventListener('change',(e)=>{
+    currentLang = e.target.value;
+    localStorage.setItem('mf_lang', currentLang);
+    applyLanguage();
+    if(currentProjectId) renderProject();
+    if(document.getElementById('view-dashboard').classList.contains('active')) renderDashboard();
+  });
+});
+
+// ================= THEME =================
+let currentTheme = localStorage.getItem('mf_theme') || 'dark';
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', currentTheme);
+  const icon = currentTheme==='dark' ? '☀' : '☾';
+  ['authThemeBtn','dashThemeBtn','projThemeBtn','welcomeThemeBtn'].forEach(id=>{
+    const b = document.getElementById(id); if(b) b.textContent = icon;
+  });
+  if(currentProjectId) drawChart();
+}
+['authThemeBtn','dashThemeBtn','projThemeBtn','welcomeThemeBtn'].forEach(id=>{
+  document.getElementById(id).addEventListener('click', ()=>{
+    currentTheme = currentTheme==='dark' ? 'light' : 'dark';
+    localStorage.setItem('mf_theme', currentTheme);
+    applyTheme();
+  });
+});
+
+// ================= CURRENCY =================
+const CURRENCIES = {
+  RUB:{symbol:'₽', locale:'ru-RU', after:true}, USD:{symbol:'$', locale:'en-US', after:false},
+  EUR:{symbol:'€', locale:'de-DE', after:false}, KZT:{symbol:'₸', locale:'ru-RU', after:true},
+  UAH:{symbol:'₴', locale:'uk-UA', after:true}, GBP:{symbol:'£', locale:'en-GB', after:false},
+};
+function fmt(n){
+  const proj = getCurrentProject();
+  const code = (proj && proj.currency) || 'RUB';
+  const c = CURRENCIES[code];
+  const num = new Intl.NumberFormat(c.locale,{maximumFractionDigits:0}).format(n||0);
+  return c.after ? `${num} ${c.symbol}` : `${c.symbol}${num}`;
+}
+const fmtPct = n => (Math.round((n||0)*10)/10) + '%';
+document.getElementById('projCurrency').addEventListener('change',(e)=>{
+  const proj = getCurrentProject();
+  proj.currency = e.target.value;
+  saveDB(); renderProject();
+});
+
+// ================= SIMPLE LOCAL "AUTH" =================
+// Note: this is local-only, client-side auth stored in this browser (no server / real security).
+function hashPass(str){
+  let h = 5381;
+  for(let i=0;i<str.length;i++) h = ((h<<5)+h) + str.charCodeAt(i);
+  return 'h' + Math.abs(h).toString(36);
+}
+function loadDB(){
+  try{ return JSON.parse(localStorage.getItem('mf_db')) || {users:{}}; }
+  catch(e){ return {users:{}}; }
+}
+function saveDBRaw(db){ localStorage.setItem('mf_db', JSON.stringify(db)); }
+let DB = loadDB();
+let session = localStorage.getItem('mf_session') || null;
+let currentProjectId = null;
+let authMode = 'login';
+
+function toggleAuthMode(){
+  authMode = authMode==='login' ? 'register' : 'login';
+  document.getElementById('authError').classList.remove('show');
+  applyLanguage();
+}
+document.getElementById('authToggleLink').addEventListener('click', toggleAuthMode);
+
+function showError(msg){
+  const el = document.getElementById('authError');
+  el.textContent = msg; el.classList.add('show');
+}
+
+// ================= TOASTS =================
+function showToast(message, type='success'){
+  const container = document.getElementById('toastContainer');
+  const icons = {success:'✓', info:'i', error:'!'};
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.innerHTML = `<span class="ic">${icons[type]||'✓'}</span><span>${message}</span>`;
+  container.appendChild(el);
+  setTimeout(()=>{
+    el.classList.add('leaving');
+    setTimeout(()=> el.remove(), 320);
+  }, 2600);
+}
+
+document.getElementById('authSubmit').addEventListener('click', ()=>{
+  const t = I18N[currentLang];
+  const email = document.getElementById('auth_email').value.trim().toLowerCase();
+  const password = document.getElementById('auth_password').value;
+  document.getElementById('authError').classList.remove('show');
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if(!email || !password){ showError(t.err_fill); return; }
+  if(!emailRegex.test(email)){ showError(t.err_invalid_email); return; }
+  const displayName = email.split('@')[0];
+  if(authMode==='register'){
+    if(password.length<4){ showError(t.err_short); return; }
+    if(DB.users[email]){ showError(t.err_exists); return; }
+    DB.users[email] = { passHash: hashPass(password), projects:{} };
+    saveDBRaw(DB);
+    session = email;
+    localStorage.setItem('mf_session', session);
+    showView('view-welcome');
+    showToast(t.toast_registered(displayName), 'success');
+  } else {
+    const u = DB.users[email];
+    if(!u || u.passHash !== hashPass(password)){ showError(t.err_notfound); return; }
+    session = email;
+    localStorage.setItem('mf_session', session);
+    goToDashboard();
+    showToast(t.toast_welcome(displayName), 'success');
+  }
+});
+document.getElementById('welcomeCtaBtn').addEventListener('click', goToDashboard);
+document.getElementById('auth_password').addEventListener('keydown',(e)=>{
+  if(e.key==='Enter') document.getElementById('authSubmit').click();
+});
+
+document.getElementById('logoutBtn').addEventListener('click', ()=>{
+  session = null;
+  localStorage.removeItem('mf_session');
+  showView('view-auth');
+});
+document.getElementById('backToDash').addEventListener('click', goToDashboard);
+
+function showView(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function goToDashboard(){
+  currentProjectId = null;
+  showView('view-dashboard');
+  document.getElementById('dashUserLabel').textContent = '/ ' + session;
+  renderDashboard();
+}
+
+// ================= DASHBOARD =================
+function getUser(){ return DB.users[session]; }
+
+function computePeriod(p){
+  const revenue = p.revenue||0, cogs = p.cogs||0, qty = p.qty||0;
+  const salaries = p.salaries||0, rent = p.rent||0, taxesPct = p.taxesPct||0, extra = p.extra||0;
+  const taxAmount = revenue*taxesPct/100;
+  const totalExpenses = cogs+salaries+rent+extra+taxAmount;
+  const profit = revenue-totalExpenses;
+  const margin = revenue>0 ? (profit/revenue*100) : 0;
+  const pricePerUnit = qty>0 ? revenue/qty : 0;
+  const varCostPerUnit = qty>0 ? cogs/qty : 0;
+  const fixedCosts = salaries+rent+extra;
+  return {revenue,totalExpenses,profit,margin,pricePerUnit,varCostPerUnit,fixedCosts,taxAmount,qty};
+}
+function marginTier(margin){
+  if(margin<0) return 'bad';
+  if(margin<10) return 'warn';
+  return 'good';
+}
+
+function renderDashGreeting(){
+  const t = I18N[currentLang];
+  const el = document.getElementById('dashGreeting');
+  if(!el) return;
+  const h = new Date().getHours();
+  const g = h<5 ? t.greeting_night : h<12 ? t.greeting_morning : h<18 ? t.greeting_day : t.greeting_evening;
+  const name = (session||'').split('@')[0];
+  el.textContent = name ? `${g}, ${name}` : g;
+}
+
+function renderDashStats(user, allIds){
+  const t = I18N[currentLang];
+  const wrap = document.getElementById('dashStatsGrid');
+  if(!wrap) return;
+  if(allIds.length===0){
+    wrap.innerHTML = `<p class="dash-empty-hint">${t.empty_projects}</p>`;
+    return;
+  }
+  let profitable=0, lossy=0, marginSum=0, marginCount=0, bestName='—', bestMargin=-Infinity;
+  allIds.forEach(id=>{
+    const p = user.projects[id];
+    const periods = p.periods||[];
+    const last = periods[periods.length-1];
+    if(!last) return;
+    const c = computePeriod(last);
+    if(c.profit>=0) profitable++; else lossy++;
+    marginSum += c.margin; marginCount++;
+    if(c.margin>bestMargin){ bestMargin=c.margin; bestName=p.name; }
+  });
+  const avgMargin = marginCount ? marginSum/marginCount : 0;
+  wrap.innerHTML = `
+    <div class="kpi-card"><div class="label">${t.stat_total_projects}</div><div class="value">${allIds.length}</div></div>
+    <div class="kpi-card"><div class="label">${t.stat_profitable}</div><div class="value"><span style="color:var(--profit)">${profitable}</span> / <span style="color:var(--loss)">${lossy}</span></div></div>
+    <div class="kpi-card"><div class="label">${t.stat_avg_margin}</div><div class="value">${fmtPct(avgMargin)}</div></div>
+    <div class="kpi-card"><div class="label">${t.stat_best_project}</div><div class="value" style="font-size:16px;">${escapeHtml(bestName)}</div></div>
+  `;
+}
+
+function renderDashboard(){
+  const t = I18N[currentLang];
+  const user = getUser();
+  renderDashGreeting();
+
+  const allIds = Object.keys(user.projects);
+  const searchInput = document.getElementById('projSearch');
+  if(searchInput) searchInput.style.display = allIds.length>0 ? '' : 'none';
+  const query = (searchInput && searchInput.value || '').trim().toLowerCase();
+  const ids = query ? allIds.filter(id=> user.projects[id].name.toLowerCase().includes(query)) : allIds;
+
+  renderDashStats(user, allIds);
+
+  const grid = document.getElementById('projGrid');
+  grid.innerHTML = '';
+  ids.forEach((id,idx)=>{
+    const proj = user.projects[id];
+    const periods = proj.periods||[];
+    const last = periods[periods.length-1];
+    const card = document.createElement('div');
+    card.className = 'proj-card';
+    card.style.animationDelay = (idx*0.05)+'s';
+    let statsHtml = `<div class="meta">${periods.length} ${t.periods_title.toLowerCase()}</div>`;
+    if(last){
+      const c = computePeriod(last);
+      statsHtml += `
+        <div class="stat"><span>${t.kpi_revenue}</span><b class="mono">${fmtForProj(proj,c.revenue)}</b></div>
+        <div class="stat"><span>${c.profit>=0?t.profit_word:t.loss_word}</span><b class="mono" style="color:${c.profit>=0?'var(--profit)':'var(--loss)'}">${fmtForProj(proj,c.profit)}</b></div>
+        <div class="proj-card-foot">
+          <span class="margin-chip ${marginTier(c.margin)}">${fmtPct(c.margin)}</span>
+          <span class="proj-currency">${proj.currency||'RUB'}</span>
+        </div>`;
+    }
+    card.innerHTML = `<button class="proj-del" data-id="${id}">✕</button><h3>${escapeHtml(proj.name)}</h3>${statsHtml}`;
+    card.addEventListener('click',(e)=>{
+      if(e.target.closest('.proj-del')) return;
+      openProject(id);
+    });
+    grid.appendChild(card);
+  });
+  const newCard = document.createElement('div');
+  newCard.className = 'proj-new';
+  newCard.style.animationDelay = (ids.length*0.05)+'s';
+  newCard.innerHTML = `<span class="plus">+</span><span>${t.new_project}</span>`;
+  newCard.addEventListener('click', createProject);
+  grid.appendChild(newCard);
+
+  grid.querySelectorAll('.proj-del').forEach(btn=>{
+    btn.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      delete user.projects[btn.dataset.id];
+      saveDB(true);
+      renderDashboard();
+      showToast(I18N[currentLang].toast_deleted, 'info');
+    });
+  });
+}
+document.getElementById('projSearch').addEventListener('input', renderDashboard);
+function fmtForProj(proj, n){
+  const c = CURRENCIES[proj.currency||'RUB'];
+  const num = new Intl.NumberFormat(c.locale,{maximumFractionDigits:0}).format(n||0);
+  return c.after ? `${num} ${c.symbol}` : `${c.symbol}${num}`;
+}
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function createProject(){
+  const t = I18N[currentLang];
+  const id = 'p'+Date.now();
+  getUser().projects[id] = {
+    name: t.default_project_name,
+    currency:'RUB',
+    periods:[ {label:t.months[0], revenue:0, cogs:0, qty:0, salaries:0, rent:0, taxesPct:0, extra:0} ],
+  };
+  saveDB(true);
+  openProject(id);
+  showToast(t.toast_created, 'success');
+}
+
+function saveDB(silentPill){
+  saveDBRaw(DB);
+  if(!silentPill){
+    const pill = document.getElementById('savePill');
+    pill.classList.add('show');
+    clearTimeout(saveDB._t);
+    saveDB._t = setTimeout(()=> pill.classList.remove('show'), 1200);
+  }
+}
+
+document.getElementById('saveProjectBtn').addEventListener('click', ()=>{
+  saveDB(true);
+  showToast(I18N[currentLang].toast_saved, 'success');
+});
+
+// ================= PROJECT VIEW =================
+function getCurrentProject(){
+  if(!currentProjectId) return null;
+  return getUser().projects[currentProjectId];
+}
+
+function openProject(id){
+  currentProjectId = id;
+  showView('view-project');
+  document.getElementById('projCurrency').value = getCurrentProject().currency||'RUB';
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.tabs button[data-ptab="periods"]').classList.add('active');
+  document.querySelectorAll('.panel-tab').forEach(p=>p.classList.remove('active'));
+  document.getElementById('ptab-periods').classList.add('active');
+  renderProject();
+}
+
+document.querySelectorAll('.tabs button').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel-tab').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('ptab-'+btn.dataset.ptab).classList.add('active');
+    if(btn.dataset.ptab==='breakeven') renderBreakeven();
+    if(btn.dataset.ptab==='kpi'){ renderKpiSummary(); renderGrowthTable(); drawChart(); }
+  });
+});
+
+document.getElementById('projName').addEventListener('input', (e)=>{
+  getCurrentProject().name = e.target.value;
+  saveDB();
+});
+
+document.getElementById('exportBtn').addEventListener('click', ()=> window.print());
+
+function renderProject(){
+  const proj = getCurrentProject();
+  document.getElementById('projName').value = proj.name;
+  renderPeriodsTable();
+  renderLatestKpi();
+  renderInsights();
+  renderBreakeven();
+  renderKpiSummary();
+  renderGrowthTable();
+  drawChart();
+}
+
+// ---- Periods table ----
+const FIELD_KEYS = ['revenue','cogs','qty','salaries','rent','taxesPct','extra'];
+function renderPeriodsTable(){
+  const proj = getCurrentProject();
+  const t = I18N[currentLang];
+  const body = document.getElementById('periodsBody');
+  body.innerHTML = '';
+  proj.periods.forEach((p,i)=>{
+    const c = computePeriod(p);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input value="${escapeHtml(p.label)}" data-i="${i}" data-f="label"></td>
+      <td class="num"><input type="number" value="${p.revenue}" data-i="${i}" data-f="revenue"></td>
+      <td class="num"><input type="number" value="${p.cogs}" data-i="${i}" data-f="cogs"></td>
+      <td class="num"><input type="number" value="${p.qty}" data-i="${i}" data-f="qty"></td>
+      <td class="num"><input type="number" value="${p.salaries}" data-i="${i}" data-f="salaries"></td>
+      <td class="num"><input type="number" value="${p.rent}" data-i="${i}" data-f="rent"></td>
+      <td class="num"><input type="number" value="${p.taxesPct}" data-i="${i}" data-f="taxesPct"></td>
+      <td class="num"><input type="number" value="${p.extra}" data-i="${i}" data-f="extra"></td>
+      <td class="num ${c.profit>=0?'pos':'neg'}" id="pf-${i}">${fmt(c.profit)}</td>
+      <td class="num ${c.margin>=0?'pos':'neg'}" id="mg-${i}">${fmtPct(c.margin)}</td>
+      <td><button data-del="${i}" style="background:none;border:none;color:var(--ink-soft);cursor:pointer;">✕</button></td>
+    `;
+    body.appendChild(tr);
+  });
+  body.querySelectorAll('input[type="number"]').forEach(inp=>{
+    inp.addEventListener('focus', ()=>{ if(inp.value==='0') inp.value=''; });
+    inp.addEventListener('blur', ()=>{ if(inp.value==='') inp.value='0'; });
+  });
+  body.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('input',(e)=>{
+      const i = e.target.dataset.i, f = e.target.dataset.f;
+      proj.periods[i][f] = (f==='label') ? e.target.value : (parseFloat(e.target.value)||0);
+      saveDB();
+      updateRowComputed(i);
+      renderLatestKpi();
+      renderInsights();
+      renderBreakeven();
+      renderKpiSummary();
+      renderGrowthTable();
+      drawChart();
+    });
+  });
+  body.querySelectorAll('[data-del]').forEach(b=>{
+    b.addEventListener('click',(e)=>{
+      if(proj.periods.length<=1) return;
+      proj.periods.splice(parseInt(e.target.dataset.del),1);
+      saveDB();
+      renderProject();
+    });
+  });
+}
+function updateRowComputed(i){
+  const proj = getCurrentProject();
+  const p = proj.periods[i];
+  const c = computePeriod(p);
+  const pfCell = document.getElementById('pf-'+i);
+  const mgCell = document.getElementById('mg-'+i);
+  if(pfCell){
+    pfCell.textContent = fmt(c.profit);
+    pfCell.className = 'num ' + (c.profit>=0?'pos':'neg');
+  }
+  if(mgCell){
+    mgCell.textContent = fmtPct(c.margin);
+    mgCell.className = 'num ' + (c.margin>=0?'pos':'neg');
+  }
+}
+document.getElementById('addPeriod').addEventListener('click', ()=>{
+  const proj = getCurrentProject();
+  const t = I18N[currentLang];
+  const next = t.months[proj.periods.length % t.months.length];
+  const last = proj.periods[proj.periods.length-1];
+  proj.periods.push({label:next, revenue:last.revenue, cogs:last.cogs, qty:last.qty,
+    salaries:last.salaries, rent:last.rent, taxesPct:last.taxesPct, extra:last.extra});
+  saveDB();
+  renderProject();
+});
+
+// ---- Insights (recommendations & warnings) ----
+function renderInsights(){
+  const proj = getCurrentProject();
+  const t = I18N[currentLang];
+  const list = document.getElementById('insightsList');
+  const periods = proj.periods;
+  const last = periods[periods.length-1];
+  const c = computePeriod(last);
+  const insights = [];
+
+  if(c.qty===0 && last.revenue>0){
+    insights.push({type:'info', text:t.ins_no_qty});
+  }
+
+  if(c.profit<0){
+    insights.push({type:'bad', text:t.ins_loss(fmt(c.revenue), fmt(c.totalExpenses))});
+  } else if(c.margin<10){
+    insights.push({type:'warn', text:t.ins_low_margin(fmtPct(c.margin))});
+  } else if(c.margin>=25){
+    insights.push({type:'good', text:t.ins_good_margin(fmtPct(c.margin))});
+  }
+
+  if(last.revenue>0 && (c.fixedCosts/last.revenue) > 0.5){
+    insights.push({type:'warn', text:t.ins_high_fixed(fmtPct(c.fixedCosts/last.revenue*100))});
+  }
+
+  if(last.revenue>0 && (c.taxAmount/last.revenue) > 0.15){
+    insights.push({type:'info', text:t.ins_high_tax(fmtPct(c.taxAmount/last.revenue*100))});
+  }
+
+  if(c.qty>0){
+    const marginUnit = c.pricePerUnit - c.varCostPerUnit;
+    if(marginUnit>0){
+      const beUnits = Math.ceil(c.fixedCosts/marginUnit);
+      if(c.qty < beUnits){
+        insights.push({type:'bad', text:t.ins_below_breakeven(beUnits-c.qty)});
+      }
+    }
+  }
+
+  if(periods.length>=2){
+    const prev = computePeriod(periods[periods.length-2]);
+    if(prev.profit!==0){
+      const change = (c.profit-prev.profit)/Math.abs(prev.profit)*100;
+      if(change<=-15) insights.push({type:'warn', text:t.ins_profit_down(fmtPct(Math.abs(change)))});
+      else if(change>=15) insights.push({type:'good', text:t.ins_profit_up(fmtPct(change))});
+    }
+  }
+  if(periods.length>=3){
+    const margins = periods.slice(-3).map(p=>computePeriod(p).margin);
+    if(margins[0]>margins[1] && margins[1]>margins[2]){
+      insights.push({type:'warn', text:t.ins_margin_trend_down});
+    }
+  }
+
+  if(insights.length===0){
+    list.innerHTML = `<p class="insights-empty">${t.insights_empty}</p>`;
+    return;
+  }
+  const icons = {bad:'⚠', warn:'⚠', good:'✓', info:'ℹ'};
+  list.innerHTML = insights.map(i=>
+    `<div class="insight ${i.type}"><span class="ic">${icons[i.type]}</span><span>${i.text}</span></div>`
+  ).join('');
+}
+
+
+function renderLatestKpi(){
+  const proj = getCurrentProject();
+  const t = I18N[currentLang];
+  const last = proj.periods[proj.periods.length-1];
+  const c = computePeriod(last);
+  const grid = document.getElementById('latestKpiGrid');
+  grid.innerHTML = `
+    <div class="kpi-card"><div class="label">${t.kpi_revenue}</div><div class="value">${fmt(c.revenue)}</div></div>
+    <div class="kpi-card"><div class="label">${t.kpi_expenses}</div><div class="value">${fmt(c.totalExpenses)}</div></div>
+    <div class="kpi-card"><div class="label">${c.profit>=0?t.profit_word:t.loss_word}</div><div class="value" style="color:${c.profit>=0?'var(--profit)':'var(--loss)'}">${fmt(c.profit)}</div></div>
+    <div class="kpi-card"><div class="label">${t.kpi_margin}</div><div class="value">${fmtPct(c.margin)}</div></div>
+  `;
+}
+
+// ---- Break-even (tab 2) ----
+function renderBreakeven(){
+  const proj = getCurrentProject();
+  const t = I18N[currentLang];
+  const pick = document.getElementById('bePeriodPick');
+  pick.innerHTML = proj.periods.map((p,i)=>`<option value="${i}">${escapeHtml(p.label)}</option>`).join('');
+  pick.value = proj.periods.length-1;
+  pick.onchange = ()=> updateBreakevenFor(parseInt(pick.value));
+  updateBreakevenFor(proj.periods.length-1);
+}
+function updateBreakevenFor(idx){
+  const proj = getCurrentProject();
+  const t = I18N[currentLang];
+  const p = proj.periods[idx];
+  const c = computePeriod(p);
+  document.getElementById('be_fixed').textContent = fmt(c.fixedCosts);
+  document.getElementById('be_price').textContent = fmt(c.pricePerUnit);
+  document.getElementById('be_var').textContent = fmt(c.varCostPerUnit);
+  const marginUnit = c.pricePerUnit - c.varCostPerUnit;
+  document.getElementById('be_marginunit').textContent = fmt(marginUnit);
+  const tagWrap = document.getElementById('be_tag');
+  if(marginUnit<=0 || c.qty===0){
+    document.getElementById('be_units').textContent = '—';
+    document.getElementById('be_revenue').textContent = '—';
+    tagWrap.innerHTML = `<div class="tag bad">${t.be_bad}</div>`;
+    return;
+  }
+  const units = Math.ceil(c.fixedCosts/marginUnit);
+  document.getElementById('be_units').textContent = units+' '+t.be_units_suffix;
+  document.getElementById('be_revenue').textContent = fmt(units*c.pricePerUnit);
+  tagWrap.innerHTML = `<div class="tag good">${t.be_ok(units)}</div>`;
+}
+
+// ---- KPI summary + chart (tab 3) ----
+function renderKpiSummary(){
+  const proj = getCurrentProject();
+  const t = I18N[currentLang];
+  const computed = proj.periods.map(computePeriod);
+  const totalRevenue = computed.reduce((s,c)=>s+c.revenue,0);
+  const totalProfit = computed.reduce((s,c)=>s+c.profit,0);
+  const avgMargin = computed.length ? computed.reduce((s,c)=>s+c.margin,0)/computed.length : 0;
+  let bestIdx=0;
+  computed.forEach((c,i)=>{ if(c.profit>computed[bestIdx].profit) bestIdx=i; });
+  const grid = document.getElementById('kpiSummaryGrid');
+  grid.innerHTML = `
+    <div class="kpi-card"><div class="label">${t.kpi_total_revenue}</div><div class="value">${fmt(totalRevenue)}</div></div>
+    <div class="kpi-card"><div class="label">${t.kpi_total_profit}</div><div class="value" style="color:${totalProfit>=0?'var(--profit)':'var(--loss)'}">${fmt(totalProfit)}</div></div>
+    <div class="kpi-card"><div class="label">${t.kpi_avg_margin}</div><div class="value">${fmtPct(avgMargin)}</div></div>
+    <div class="kpi-card"><div class="label">${t.kpi_best}</div><div class="value" style="font-size:16px;">${escapeHtml(proj.periods[bestIdx].label)}</div></div>
+  `;
+}
+
+function growthChip(pct){
+  if(!isFinite(pct)) return `<span class="growth-chip flat">—</span>`;
+  const dir = pct>0.05 ? 'up' : (pct<-0.05 ? 'down' : 'flat');
+  const arrow = dir==='up' ? '▲' : (dir==='down' ? '▼' : '·');
+  return `<span class="growth-chip ${dir}">${arrow} ${fmtPct(Math.abs(pct))}</span>`;
+}
+
+function renderGrowthTable(){
+  const proj = getCurrentProject();
+  const t = I18N[currentLang];
+  const table = document.getElementById('growthTable');
+  const computed = proj.periods.map(computePeriod);
+  let thead = `<tr><th>${t.growth_period}</th><th>${t.growth_revenue}</th><th>${t.growth_expenses}</th><th>${t.growth_profit}</th></tr>`;
+  let rows = '';
+  computed.forEach((c,i)=>{
+    const prev = i>0 ? computed[i-1] : null;
+    const revPct = prev && prev.revenue!==0 ? (c.revenue-prev.revenue)/Math.abs(prev.revenue)*100 : NaN;
+    const expPct = prev && prev.totalExpenses!==0 ? (c.totalExpenses-prev.totalExpenses)/Math.abs(prev.totalExpenses)*100 : NaN;
+    const profPct = prev && prev.profit!==0 ? (c.profit-prev.profit)/Math.abs(prev.profit)*100 : NaN;
+    rows += `<tr>
+      <td>${escapeHtml(proj.periods[i].label)}</td>
+      <td>${fmt(c.revenue)} ${prev?growthChip(revPct):''}</td>
+      <td>${fmt(c.totalExpenses)} ${prev?growthChip(expPct):''}</td>
+      <td>${fmt(c.profit)} ${prev?growthChip(profPct):''}</td>
+    </tr>`;
+  });
+  table.innerHTML = thead + rows;
+}
+
+let chartAnim = null;
+function drawChart(){
+  if(!currentProjectId) return;
+  const canvas = document.getElementById('chart');
+  if(!canvas) return;
+  if(chartAnim) cancelAnimationFrame(chartAnim);
+  const start = performance.now();
+  const duration = 650;
+  function ease(x){ return 1-Math.pow(1-x,3); }
+  function frame(now){
+    const p = Math.min(1, (now-start)/duration);
+    drawChartFrame(ease(p));
+    if(p<1) chartAnim = requestAnimationFrame(frame);
+  }
+  chartAnim = requestAnimationFrame(frame);
+}
+function drawChartFrame(progress){
+  const proj = getCurrentProject();
+  const canvas = document.getElementById('chart');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio||1;
+  const w = canvas.clientWidth||600, h = 230;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+  const rows = proj.periods.map(p=>({label:p.label, ...computePeriod(p)}));
+  if(rows.length===0) return;
+
+  const isDark = document.documentElement.getAttribute('data-theme')==='dark';
+  const lineColor = isDark ? '#242933' : '#E4E2DA';
+  const textColor = isDark ? '#8A9099' : '#666E68';
+  const profitColor = isDark ? '#3FBB86' : '#1F8F63';
+  const alertColor = isDark ? '#E1685A' : '#C43E32';
+  const goldColor = isDark ? '#D4AF56' : '#A9791C';
+
+  const maxVal = Math.max(...rows.map(r=>Math.max(r.revenue,r.totalExpenses)), 1);
+  const padL=44, padB=26, padT=10;
+  const chartW = w-padL-10, chartH = h-padB-padT;
+  const bw = chartW/rows.length;
+
+  ctx.strokeStyle = lineColor; ctx.lineWidth = 1;
+  for(let i=0;i<=4;i++){
+    const y = padT + chartH - (chartH*i/4);
+    ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-5,y); ctx.stroke();
+    ctx.fillStyle = textColor; ctx.font = '10px JetBrains Mono, monospace';
+    ctx.fillText(Math.round(maxVal*i/4/1000)+'k', 4, y+3);
+  }
+  const profitPoints = [];
+  rows.forEach((row,i)=>{
+    const x = padL + i*bw + bw*0.15;
+    const barW = bw*0.3;
+    const revH = (row.revenue/maxVal)*chartH*progress;
+    const expH = (row.totalExpenses/maxVal)*chartH*progress;
+    ctx.fillStyle = profitColor;
+    ctx.fillRect(x, padT+chartH-revH, barW, revH);
+    ctx.fillStyle = alertColor;
+    ctx.fillRect(x+barW+3, padT+chartH-expH, barW, expH);
+    ctx.fillStyle = textColor; ctx.font = '10px JetBrains Mono, monospace';
+    ctx.textAlign='center';
+    ctx.fillText(row.label.slice(0,8), x+barW, h-8);
+    ctx.textAlign='left';
+    const py = padT+chartH-((row.profit/maxVal)*chartH*progress);
+    profitPoints.push([x+barW, Math.max(padT,Math.min(padT+chartH,py))]);
+  });
+  ctx.strokeStyle = goldColor; ctx.lineWidth = 2;
+  ctx.beginPath();
+  profitPoints.forEach(([x,y],i)=> i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y));
+  ctx.stroke();
+  profitPoints.forEach(([x,y])=>{
+    ctx.fillStyle = goldColor;
+    ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
+  });
+}
+window.addEventListener('resize', ()=>{
+  if(currentProjectId && document.getElementById('ptab-kpi').classList.contains('active')) drawChart();
+});
+
+// ================= INIT =================
+applyLanguage();
+applyTheme();
+if(session && DB.users[session]){
+  goToDashboard();
+} else {
+  session = null;
+  showView('view-auth');
+}
+setTimeout(()=>{
+  document.getElementById('loadingScreen').classList.add('hidden');
+}, 550);
+</script>
+</body>
+</html>
