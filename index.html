@@ -589,7 +589,7 @@ catch(e){ console.error('Supabase init failed', e); }
 const SUPABASE_NEEDS_SETUP = SUPABASE_URL.includes('YOUR-PROJECT-REF') || SUPABASE_ANON_KEY.includes('YOUR-ANON') || !sb;
 if(SUPABASE_NEEDS_SETUP){
   document.getElementById('setupBanner').classList.add('show');
-  document.getElementById('loadingScreen').classList.add('hidden');
+  document.getElementById('loadingScreen').style.display = 'none';
 }
 
 // ================= I18N =================
@@ -1667,7 +1667,7 @@ if(!SUPABASE_NEEDS_SETUP){
       }
     })();
     await Promise.all([authCheck, minDelay]);
-    document.getElementById('loadingScreen').classList.add('hidden');
+    document.getElementById('loadingScreen').style.display = 'none';
   })();
 }
 </script>
