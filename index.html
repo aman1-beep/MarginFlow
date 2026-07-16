@@ -322,37 +322,11 @@
       <div class="field">
         <label data-i18n="auth_email">Email</label>
         <input id="auth_email" type="email" autocomplete="email" placeholder="you@example.com">
+      </div>
       <div class="field">
-  <label data-i18n="auth_password">Пароль</label>
-
-  <div style="position: relative;">
-
-    <input
-      id="auth_password"
-      type="password"
-      autocomplete="current-password"
-      style="padding-right: 45px;"
-    >
-
-    <button
-      type="button"
-      id="togglePassword"
-      style="
-        position: absolute;
-        right: 10px;
-        top: 50%;
-        transform: translateY(-50%);
-        border: none;
-        background: transparent;
-        cursor: pointer;
-        font-size: 18px;
-      "
-    >
-      👁
-    </button>
-
-  </div>
-</div>
+        <label data-i18n="auth_password">Пароль</label>
+        <input id="auth_password" type="password" autocomplete="current-password">
+      </div>
     </div>
     <button class="btn btn-gold" id="authSubmit" data-i18n="auth_login_btn">Войти</button>
     <p class="auth-toggle" id="authToggleText">
@@ -1670,15 +1644,6 @@ if(!SUPABASE_NEEDS_SETUP){
     document.getElementById('loadingScreen').classList.add('hidden');
   })();
 }
-document.getElementById('togglePassword').addEventListener('click', () => {
-    const input = document.getElementById('auth_password');
-
-    if (input.type === 'password') {
-        input.type = 'text';
-    } else {
-        input.type = 'password';
-    }
-});
 </script>
 </body>
 </html>
