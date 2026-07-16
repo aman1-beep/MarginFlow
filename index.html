@@ -333,24 +333,10 @@
       autocomplete="current-password"
       style="padding-right: 45px;"
     >
-
-    <button
-      type="button"
-      id="togglePassword"
-      style="
-        position: absolute;
-        right: 10px;
-        top: 50%;
-        transform: translateY(-50%);
-        border: none;
-        background: transparent;
-        cursor: pointer;
-        font-size: 18px;
-      "
-    >
-      👁
-    </button>
-
+   <div class="field">
+  <label data-i18n="auth_password">Пароль</label>
+  <input id="auth_password" type="password" autocomplete="current-password">
+</div>
   </div>
 </div>
     </div>
@@ -589,7 +575,7 @@ catch(e){ console.error('Supabase init failed', e); }
 const SUPABASE_NEEDS_SETUP = SUPABASE_URL.includes('YOUR-PROJECT-REF') || SUPABASE_ANON_KEY.includes('YOUR-ANON') || !sb;
 if(SUPABASE_NEEDS_SETUP){
   document.getElementById('setupBanner').classList.add('show');
-  document.getElementById('loadingScreen').style.display = 'none';
+  document.getElementById('loadingScreen').classList.add('hidden');
 }
 
 // ================= I18N =================
@@ -1667,7 +1653,7 @@ if(!SUPABASE_NEEDS_SETUP){
       }
     })();
     await Promise.all([authCheck, minDelay]);
-    document.getElementById('loadingScreen').style.display = 'none';
+    document.getElementById('loadingScreen').classList.add('hidden');
   })();
 }
 </script>
