@@ -862,20 +862,31 @@ function mapAuthError(error, t){
   return msg || t.err_generic;
 }
 
-async function loadProfileAndGate(){
+async function loadProfileAndGate() {
   const t = I18N[currentLang];
-  const { data: profile, error } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
-  console.log(profile);
-if(error || !profile){
+
+  const { data: profile, error } = await sb
+    .from('profiles')
+    .select('*')
+    .eq('id', currentUser.id)
+    .single();
+
+  console.log('USER:', currentUser);
+  console.log('PROFILE:', profile);
+  console.log('ERROR:', error);
+
+  if (error || !profile) {
     showError(t.err_profile_missing);
     await sb.auth.signOut();
     return false;
   }
-  if(profile.access === false){
+
+  if (profile.access === false) {
     showError(t.err_access_disabled);
     await sb.auth.signOut();
     return false;
   }
+
   currentProfile = profile;
   applyRoleUI();
   subscribeToOwnProfile();
